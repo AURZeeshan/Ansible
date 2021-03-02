@@ -1,0 +1,73 @@
+
+---
+- hosts: all
+  become: true
+  tasks:
+   - name: Install build-essential 
+     apt: pkg=build-essential state=present
+
+   - name: Install git-core subversion libjansson-dev sqlite autoconf automake libxml2-dev libncurses5-dev libtool
+     apt: 
+       name: [ 'git-core', 'subversion', 'libjansson-dev', 'sqlite', 'autoconf', 'automake', 'libxml2-dev', 'libncurses5-dev', 'libtool','binutils-dev','bison','doxygen','flex','freetds-dev','libasound2-dev','libbluetooth-dev','libcfg-dev','libcorosync-common-dev','libcpg-dev','libcurl4-openssl-dev','libedit-dev','libfftw3-dev','libical-dev','libjack-jackd2-dev','libjansson-dev','libldap2-dev','liblua5.2-dev','libmysqlclient-dev','libneon27-dev','libnewt-dev','libogg-dev','libpopt-dev','libpq-dev','libsndfile1-dev','libsnmp-dev','libspeex-dev','uuid-dev','libspeexdsp-dev','libsqlite3-dev','libxslt1-dev','pkg-config','python-dev','unixodbc-dev','uuid-dev','zlib1g-dev','graphviz','libc-client2007e-dev','libcodec2-dev','libgmime-2.6-dev','libgsm1-dev','libiksemel-dev','libosptk-dev','libradcli-dev','libresample1-dev','libspandsp-dev','libsrtp2-dev','liburiparser-dev','libvpb-dev','pkgconf','portaudio19-dev','subversion','xmlstarlet']
+       state: present
+       update_cache: yes
+
+   - name: download Asterisk 16
+     get_url:
+       url:  https://downloads.asterisk.org/pub/telephony/asterisk/asterisk-16-current.tar.gz 
+       dest: /home/
+
+   - name: untar Asterisk
+     unarchive:
+       src: /home/asterisk-16-current.tar.gz
+       dest: /home/
+       remote_src: yes	
+
+   - name: remove compressed file
+     file:
+       path: /home/asterisk-16-current.tar.gz
+       state: absent
+
+   - name: get the name of asterix folder
+     find:
+       file_type: directory
+       path: /home/
+       pattern: "asterisk-*"
+     register: asterix_folder
+
+   - name: shows the folder name
+     debug:
+       msg: "{{ asterix_folder }}"
+   - name: Configure asterisk
+     shell: ./configure --with-pj-project-bundled
+     args:
+       chdir: "{{ asterix_folder.files[0].path}}"
+
+   - name: Build Asterisk
+     make:
+       chdir: "{{ asterix_folder.files[0].path }}"
+
+   - name: Install Asterisk
+     make:
+       chdir: "{{ asterix_folder.files[0].path }}"
+       target: install
+
+   - name: Generate Init services for Asterisk
+     make:
+       chdir: "{{ asterix_folder.files[0].path }}"
+       target: config
+
+   - name: Generate samples for Asterisk
+     make:
+       chdir: "{{ asterix_folder.files[0].path }}"
+       target: samples
+
+   - name: Enable Asterisk service
+     systemd:
+       enabled: yes
+       name: asterisk
+
+   - name: Start Asterisk service
+     systemd:
+       state: started
+       name: asterisk
